@@ -53,6 +53,7 @@ export default async function TreePage({
     parentEdges: layout.parentEdges,
     couples: layout.couples.map((c) => ({
       key: c.key,
+      partnerType: c.partnerType,
       a: toDTO(c.a, portraits, withParents),
       b: c.b ? toDTO(c.b, portraits, withParents) : null,
       x: c.x,

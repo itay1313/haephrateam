@@ -1,5 +1,5 @@
 import type { Person } from "@prisma/client";
-import { buildGraph, children, partners, type Graph } from "./genealogy";
+import { buildGraph, partners, type Graph } from "./genealogy";
 
 export type GenerationBucket = {
   /** 0-based from the oldest currently documented generation. Shifts when ancestors are added. */
@@ -17,53 +17,34 @@ export function computeGenerations(graph: Graph): Map<string, number> {
   const gen = new Map<string, number>();
   const people = graph.people.filter((p) => !p.isPlaceholder);
 
-  const assign = (id: string, value: number) => {
-    const current = gen.get(id);
-    if (current === undefined || value < current) gen.set(id, value);
-  };
+  // Everyone starts at the top and is pushed down: a child sits one below its
+  // deepest parent, and a partner who married in joins the generation of the
+  // person they are with — otherwise a spouse with no recorded parents would
+  // pull the whole couple up to the oldest row.
+  for (const person of people) gen.set(person.id, 0);
 
-  // Seed: people with no recorded parents.
-  for (const person of people) {
-    const hasParents = (graph.parentsOf.get(person.id) ?? []).some((id) => {
-      const p = graph.byId.get(id);
-      return p && !p.isPlaceholder;
-    });
-    if (!hasParents) assign(person.id, 0);
-  }
-
-  // Relax constraints until stable (handles both family sides + partners).
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 32; i++) {
     let changed = false;
     for (const person of people) {
-      const g = gen.get(person.id);
-      if (g === undefined) continue;
+      let want = gen.get(person.id) ?? 0;
+
+      for (const parentId of graph.parentsOf.get(person.id) ?? []) {
+        const parent = graph.byId.get(parentId);
+        if (!parent || parent.isPlaceholder) continue;
+        want = Math.max(want, (gen.get(parentId) ?? 0) + 1);
+      }
 
       for (const partner of partners(graph, person.id)) {
         if (partner.isPlaceholder) continue;
-        const pg = gen.get(partner.id);
-        const next = pg === undefined ? g : Math.min(pg, g);
-        if (pg !== next) {
-          gen.set(partner.id, next);
-          gen.set(person.id, next);
-          changed = true;
-        }
+        want = Math.max(want, gen.get(partner.id) ?? 0);
       }
 
-      for (const child of children(graph, person.id)) {
-        if (child.isPlaceholder) continue;
-        const cg = gen.get(child.id);
-        const next = g + 1;
-        if (cg === undefined || next < cg) {
-          gen.set(child.id, next);
-          changed = true;
-        }
+      if (want !== gen.get(person.id)) {
+        gen.set(person.id, want);
+        changed = true;
       }
     }
     if (!changed) break;
-  }
-
-  for (const person of people) {
-    if (!gen.has(person.id)) gen.set(person.id, 0);
   }
 
   for (const placeholder of graph.people.filter((p) => p.isPlaceholder)) {

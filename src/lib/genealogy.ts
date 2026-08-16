@@ -8,6 +8,8 @@ export type Graph = {
   parentsOf: Map<string, string[]>;
   childrenOf: Map<string, string[]>;
   partnersOf: Map<string, string[]>;
+  /** coupleKey -> MARRIED | PARTNER | FORMER | ENGAGED */
+  partnerTypeOf: Map<string, string>;
 };
 
 export function buildGraph(
@@ -19,6 +21,7 @@ export function buildGraph(
   const parentsOf = new Map<string, string[]>();
   const childrenOf = new Map<string, string[]>();
   const partnersOf = new Map<string, string[]>();
+  const partnerTypeOf = new Map<string, string>();
 
   const push = (map: Map<string, string[]>, key: string, value: string) => {
     const list = map.get(key) ?? [];
@@ -34,9 +37,10 @@ export function buildGraph(
   for (const rel of partnerships) {
     push(partnersOf, rel.personAId, rel.personBId);
     push(partnersOf, rel.personBId, rel.personAId);
+    partnerTypeOf.set(coupleKey(rel.personAId, rel.personBId), rel.type);
   }
 
-  return { people, byId, parentsOf, childrenOf, partnersOf };
+  return { people, byId, parentsOf, childrenOf, partnersOf, partnerTypeOf };
 }
 
 export function parents(graph: Graph, id: string) {
@@ -61,6 +65,18 @@ export function partners(graph: Graph, id: string) {
   return (graph.partnersOf.get(id) ?? [])
     .map((pid) => graph.byId.get(pid))
     .filter((p): p is Person => Boolean(p));
+}
+
+/** Partners with the kind of bond, so a former partner is never shown as a current one. */
+export function partnersWithType(graph: Graph, id: string) {
+  return partners(graph, id).map((person) => ({
+    person,
+    type: graph.partnerTypeOf.get(coupleKey(id, person.id)) ?? "PARTNER",
+  }));
+}
+
+export function isFormer(type: string) {
+  return type === "FORMER";
 }
 
 export function siblings(graph: Graph, id: string) {

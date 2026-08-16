@@ -2,7 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { loadGraph, loadPersonBySlug, mediaUrl } from "@/lib/queries";
-import { children, displayName, grandparents, parents, partners, siblings } from "@/lib/genealogy";
+import {
+  children,
+  displayName,
+  grandparents,
+  isFormer,
+  parents,
+  partnersWithType,
+  siblings,
+} from "@/lib/genealogy";
 import { kinshipPath } from "@/lib/kinship";
 import { lifeLabel } from "@/lib/format";
 import { Portrait } from "@/components/person/Portrait";
@@ -36,7 +44,11 @@ export default async function PersonPage({
   const { graph, people } = await loadGraph();
 
   const parentList = parents(graph, person.id);
-  const partnerList = partners(graph, person.id).filter((p) => !p.isPlaceholder);
+  const partnerBonds = partnersWithType(graph, person.id).filter(
+    (b) => !b.person.isPlaceholder,
+  );
+  const partnerList = partnerBonds.filter((b) => !isFormer(b.type)).map((b) => b.person);
+  const formerList = partnerBonds.filter((b) => isFormer(b.type)).map((b) => b.person);
   const childList = children(graph, person.id).filter((p) => !p.isPlaceholder);
   const siblingList = siblings(graph, person.id).filter((p) => !p.isPlaceholder);
   const gp = grandparents(graph, person.id);
@@ -91,10 +103,28 @@ export default async function PersonPage({
               <div>
                 <dt className="text-sm text-muted">בן/בת זוג</dt>
                 <dd>
-                  {partnerList.map((p) => (
-                    <Link key={p.id} href={`/people/${p.slug}`} className="border-b border-ink/20">
-                      {p.firstName}
-                    </Link>
+                  {partnerList.map((p, i) => (
+                    <span key={p.id}>
+                      {i > 0 ? " · " : ""}
+                      <Link href={`/people/${p.slug}`} className="border-b border-ink/20">
+                        {p.firstName}
+                      </Link>
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            ) : null}
+            {formerList.length ? (
+              <div>
+                <dt className="text-sm text-muted">בן/בת זוג לשעבר</dt>
+                <dd>
+                  {formerList.map((p, i) => (
+                    <span key={p.id}>
+                      {i > 0 ? " · " : ""}
+                      <Link href={`/people/${p.slug}`} className="border-b border-ink/20">
+                        {p.firstName}
+                      </Link>
+                    </span>
                   ))}
                 </dd>
               </div>
@@ -195,6 +225,11 @@ export default async function PersonPage({
             <FamilyCol title="בן/בת זוג" people={partnerList} portraits={people} />
             <FamilyCol title="ילדים" people={childList} portraits={people} />
           </div>
+          {formerList.length ? (
+            <div className="mt-12">
+              <FamilyCol title="בן/בת זוג לשעבר" people={formerList} portraits={people} />
+            </div>
+          ) : null}
           {gp.length ? (
             <div className="mt-12">
               <FamilyCol title="סבים וסבתות" people={gp} portraits={people} />

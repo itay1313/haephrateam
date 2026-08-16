@@ -24,6 +24,7 @@ export type TreeLayoutDTO = {
   height: number;
   couples: {
     key: string;
+    partnerType: string | null;
     a: TreePersonDTO;
     b: TreePersonDTO | null;
     x: number;
@@ -209,6 +210,9 @@ export function FamilyTree({
                     className="absolute flex gap-7"
                     style={{ left: c.x, top: c.y }}
                   >
+                    {c.b && !c.b.isPlaceholder && !c.a.isPlaceholder ? (
+                      <PartnerBond former={c.partnerType === "FORMER"} />
+                    ) : null}
                     <PersonCard
                       person={c.a}
                       selected={selected === c.a.id}
@@ -335,6 +339,30 @@ function PersonCard({
         >
           {collapsed ? "פתיחת ענף" : "סגירת ענף"}
         </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The short line between two cards. A bond that ended is drawn dashed and named
+ * plainly — it stays part of the family record without being singled out.
+ */
+function PartnerBond({ former }: { former: boolean }) {
+  return (
+    <div
+      className="pointer-events-none absolute z-0 flex flex-col items-center"
+      style={{ left: TREE_CARD.w, top: TREE_CARD.h / 2 - 24, width: TREE_CARD.gap + 28 }}
+    >
+      <div
+        className={`w-full border-t ${
+          former ? "border-dashed border-ink/25" : "border-ink/40"
+        }`}
+      />
+      {former ? (
+        <span dir="rtl" className="mt-1 text-[10px] leading-none text-muted">
+          לשעבר
+        </span>
       ) : null}
     </div>
   );

@@ -13,6 +13,8 @@ export type LaidCouple = {
   key: string;
   a: Person;
   b: Person | null;
+  /** MARRIED | PARTNER | FORMER | ENGAGED — null when the person stands alone. */
+  partnerType: string | null;
   x: number;
   y: number;
   gen: number;
@@ -89,7 +91,7 @@ export function layoutTree(graph: Graph, collapsed = new Set<string>()): TreeLay
     units.push({
       a: femaleFirst.a,
       b: femaleFirst.b,
-      gen: partner ? Math.min(gen, genMap.get(partner.id) ?? gen) : gen,
+      gen: partner ? Math.max(gen, genMap.get(partner.id) ?? gen) : gen,
       childIds: childIds.filter((id) => visible.has(id)),
     });
   }
@@ -164,6 +166,7 @@ export function layoutTree(graph: Graph, collapsed = new Set<string>()): TreeLay
       key: keyOf(unit),
       a: unit.a,
       b: unit.b,
+      partnerType: unit.b ? graph.partnerTypeOf.get(coupleKey(unit.a.id, unit.b.id)) ?? "PARTNER" : null,
       x: pos.x,
       y: pos.y,
       gen: unit.gen,
