@@ -1,0 +1,360 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Access ───────────────────────────────────────────────────────────────────
+// A Person can exist without a User (ancestors, historical figures).
+// A User may optionally link to a Person profile.
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  displayName   String?
+  role          String   @default("FAMILY") // OWNER | ADMIN | FAMILY | VIEWER
+  personId      String?  @unique
+  person        Person?  @relation(fields: [personId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions      Session[]
+  invitations   Invitation[] @relation("InvitedBy")
+  mediaUploaded Media[]      @relation("UploadedBy")
+  mediaProvided Media[]      @relation("ProvidedBy")
+  stories       Story[]
+  comments      Comment[]
+  memories      Memory[]
+}
+
+model Session {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token              String    @unique
+  expiresAt          DateTime
+  googleAccessToken  String?
+  googleRefreshToken String?
+  googleTokenExpiry  DateTime?
+  googlePickerId     String?
+  googlePickerUri    String?
+  createdAt          DateTime  @default(now())
+}
+
+model Invitation {
+  id          String    @id @default(cuid())
+  email       String
+  token       String    @unique
+  role        String    @default("FAMILY")
+  invitedById String
+  invitedBy   User      @relation("InvitedBy", fields: [invitedById], references: [id])
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── Family branches ──────────────────────────────────────────────────────────
+// Surnames / lineages such as האפרתי and ברג. A person may belong to several.
+
+model Family {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  name        String
+  surname     String?
+  description String?
+  people      PersonFamily[]
+  createdAt   DateTime       @default(now())
+}
+
+model PersonFamily {
+  personId String
+  familyId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  family   Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@id([personId, familyId])
+}
+
+// ─── People ───────────────────────────────────────────────────────────────────
+
+model Person {
+  id              String    @id @default(cuid())
+  slug            String    @unique
+  firstName       String
+  lastName        String?
+  maidenName      String?
+  gender          String    @default("UNKNOWN") // MALE | FEMALE | UNKNOWN
+  birthDate       DateTime?
+  deathDate       DateTime?
+  birthPlace      String?
+  deathPlace      String?
+  occupation      String?
+  biography       String?
+  isPlaceholder   Boolean   @default(false)
+  placeholderKind String? // PARTNER | CHILDREN | GRANDCHILDREN | PARENTS
+  attachedToId    String?
+  attachedTo      Person?   @relation("Placeholders", fields: [attachedToId], references: [id])
+  placeholders    Person[]  @relation("Placeholders")
+  portraitId      String?
+  portrait        Media?    @relation("Portrait", fields: [portraitId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User?
+  families        PersonFamily[]
+  parentLinks     ParentChild[]  @relation("Parent")
+  childLinks      ParentChild[]  @relation("Child")
+  partnershipsA   Partnership[]  @relation("PartnerA")
+  partnershipsB   Partnership[]  @relation("PartnerB")
+  media           PersonMedia[]
+  stories         PersonStory[]
+  events          PersonEvent[]
+  memories        PersonMemory[]
+  comments        Comment[]
+}
+
+// Directed parent → child. Supports biological, adoptive, step, unknown.
+// Never store fatherId/motherId on Person — unknown parents, multiple
+// marriages, and later ancestor generations all need this flexibility.
+
+model ParentChild {
+  id        String  @id @default(cuid())
+  parentId  String
+  childId   String
+  type      String  @default("BIOLOGICAL") // BIOLOGICAL | ADOPTIVE | STEP | GUARDIAN | UNKNOWN
+  sortOrder Int     @default(0)
+  notes     String?
+  parent    Person  @relation("Parent", fields: [parentId], references: [id], onDelete: Cascade)
+  child     Person  @relation("Child", fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, childId])
+  @@index([childId])
+  @@index([parentId])
+}
+
+model Partnership {
+  id        String    @id @default(cuid())
+  personAId String
+  personBId String
+  type      String    @default("MARRIED") // MARRIED | PARTNER | FORMER | ENGAGED
+  startDate DateTime?
+  endDate   DateTime?
+  notes     String?
+  personA   Person    @relation("PartnerA", fields: [personAId], references: [id], onDelete: Cascade)
+  personB   Person    @relation("PartnerB", fields: [personBId], references: [id], onDelete: Cascade)
+
+  @@unique([personAId, personBId])
+}
+
+// ─── Places & tags ────────────────────────────────────────────────────────────
+
+model Location {
+  id      String  @id @default(cuid())
+  name    String
+  region  String?
+  country String?
+  media   Media[]
+  stories Story[]
+  events  Event[]
+}
+
+model Tag {
+  id      String     @id @default(cuid())
+  name    String     @unique
+  media   MediaTag[]
+  stories StoryTag[]
+}
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+// Photos, scanned documents, video, voice. Stored privately; served via
+// authenticated routes. Architecture is ready for signed URLs later.
+
+model Media {
+  id           String    @id @default(cuid())
+  type         String    @default("PHOTO") // PHOTO | VIDEO | DOCUMENT | AUDIO | LETTER | RECIPE | OBJECT
+  title        String?
+  filename     String
+  mimeType     String
+  storageKey   String
+  width        Int?
+  height       Int?
+  year         Int?
+  takenAt      DateTime?
+  caption      String?
+  narrative    String?
+  locationId   String?
+  location     Location? @relation(fields: [locationId], references: [id])
+  uploadedById String?
+  uploadedBy   User?     @relation("UploadedBy", fields: [uploadedById], references: [id])
+  providedById String?
+  providedBy   User?     @relation("ProvidedBy", fields: [providedById], references: [id])
+  albumId      String?
+  album        Album?    @relation(fields: [albumId], references: [id])
+  eventId      String?
+  event        Event?    @relation(fields: [eventId], references: [id])
+  isHistorical Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  people     PersonMedia[]
+  stories    StoryMedia[]
+  memories   MemoryMedia[]
+  portraits  Person[]      @relation("Portrait")
+  comments   Comment[]
+  tags       MediaTag[]
+}
+
+model PersonMedia {
+  personId String
+  mediaId  String
+  role     String? // SUBJECT | PHOTOGRAPHER
+  person   Person  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  media    Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([personId, mediaId])
+}
+
+model MediaTag {
+  mediaId String
+  tagId   String
+  media   Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, tagId])
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  title       String
+  description String?
+  category    String?
+  year        Int?
+  coverKey    String?
+  media       Media[]
+  createdAt   DateTime @default(now())
+}
+
+// ─── Stories & memories ───────────────────────────────────────────────────────
+
+model Story {
+  id         String    @id @default(cuid())
+  slug       String    @unique
+  title      String
+  excerpt    String?
+  body       String
+  year       Int?
+  decade     Int?
+  featured   Boolean   @default(false)
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id])
+  authorId   String?
+  author     User?     @relation(fields: [authorId], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  people   PersonStory[]
+  media    StoryMedia[]
+  comments Comment[]
+  tags     StoryTag[]
+}
+
+model PersonStory {
+  personId String
+  storyId  String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  story    Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@id([personId, storyId])
+}
+
+model StoryMedia {
+  storyId   String
+  mediaId   String
+  caption   String?
+  sortOrder Int     @default(0)
+  story     Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  media     Media   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, mediaId])
+}
+
+model StoryTag {
+  storyId String
+  tagId   String
+  story   Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, tagId])
+}
+
+model Memory {
+  id        String   @id @default(cuid())
+  title     String
+  body      String?
+  year      Int?
+  onThisDay String? // MM-DD for "היום לפני..."
+  authorId  String?
+  author    User?    @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+
+  people PersonMemory[]
+  media  MemoryMedia[]
+}
+
+model PersonMemory {
+  personId String
+  memoryId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  memory   Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@id([personId, memoryId])
+}
+
+model MemoryMedia {
+  memoryId String
+  mediaId  String
+  memory   Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  media    Media  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([memoryId, mediaId])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  title       String
+  type        String? // WEDDING | BIRTHDAY | HOLIDAY | MILITARY | TRAVEL | HISTORIC
+  date        DateTime?
+  year        Int?
+  description String?
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id])
+  media       Media[]
+  people      PersonEvent[]
+}
+
+model PersonEvent {
+  personId String
+  eventId  String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  event    Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([personId, eventId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  personId  String?
+  person    Person?  @relation(fields: [personId], references: [id])
+  mediaId   String?
+  media     Media?   @relation(fields: [mediaId], references: [id])
+  storyId   String?
+  story     Story?   @relation(fields: [storyId], references: [id])
+  createdAt DateTime @default(now())
+}

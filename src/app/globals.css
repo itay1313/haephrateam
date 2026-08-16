@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #f6f1e8;
+  --paper-deep: #ebe3d4;
+  --cream: #fbf7f0;
+  --ink: #161310;
+  --ink-soft: #4d463e;
+  --muted: #7a7166;
+  --bronze: #9a6a3a;
+  --wine: #7a3d32;
+  --line: rgba(22, 19, 16, 0.1);
+  --line-strong: rgba(22, 19, 16, 0.2);
+  --night: #12100e;
+  --shadow: 0 30px 80px rgba(22, 19, 16, 0.14);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-bronze: var(--bronze);
+  --color-wine: var(--wine);
+  --color-night: var(--night);
+  --font-display: var(--font-rubik);
+  --font-sans: var(--font-rubik);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-rubik), "Rubik", sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: #ead9bd;
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+.font-display {
+  font-family: var(--font-rubik), "Rubik", sans-serif;
+}
+
+.prose-family {
+  max-width: 40rem;
+  font-size: 1.15rem;
+  line-height: 1.9;
+  font-weight: 400;
+}
+
+.prose-family p + p {
+  margin-top: 1.4em;
+}
+
+.kicker {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--bronze);
+  font-weight: 500;
+}
+
+.nav-link {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  font-weight: 400;
+  transition: color 180ms ease;
+}
+
+.nav-link:hover,
+.nav-link[data-active="true"] {
+  color: var(--ink);
+}
+
+.tree-canvas {
+  cursor: grab;
+}
+
+.tree-canvas:active {
+  cursor: grabbing;
+}
+
+input,
+textarea,
+select {
+  font-size: 1rem;
+  background: var(--cream);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  padding: 0.7rem 0.9rem;
+  width: 100%;
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--bronze);
+}
+
+::placeholder {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
