@@ -1,7 +1,7 @@
 "use client";
 
-import { TransformComponent, TransformWrapper } from "react-zoom-pan-pinch";
-import { useMemo, useState } from "react";
+import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TREE_CARD } from "@/lib/tree-layout";
 import { Portrait } from "@/components/person/Portrait";
@@ -16,6 +16,7 @@ export type TreePersonDTO = {
   isPlaceholder: boolean;
   placeholderKind: string | null;
   portraitUrl: string | null;
+  hasParents: boolean;
 };
 
 export type TreeLayoutDTO = {
@@ -37,6 +38,10 @@ function nameOf(p: TreePersonDTO) {
   return [p.firstName, p.lastName].filter(Boolean).join(" ");
 }
 
+function coupleWidth(couple: TreeLayoutDTO["couples"][number]) {
+  return couple.b ? TREE_CARD.w * 2 + TREE_CARD.gap : TREE_CARD.w;
+}
+
 export function FamilyTree({
   layout,
   focusId,
@@ -45,7 +50,7 @@ export function FamilyTree({
   focusId?: string;
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<string | null>(focusId ?? null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const coupleByKey = useMemo(
@@ -79,39 +84,81 @@ export function FamilyTree({
     return null;
   }, [layout, selected]);
 
-  const jump = layout.couples.find(
-    (c) =>
-      nameOf(c.a).includes(q) || (c.b && nameOf(c.b).includes(q)) || c.a.firstName === q,
+  const query = q.trim();
+  const jump = query
+    ? layout.couples.find(
+        (c) => nameOf(c.a).includes(query) || (c.b && nameOf(c.b).includes(query)),
+      )
+    : undefined;
+
+  const frameRef = useRef<HTMLDivElement>(null);
+
+  // Fill whatever is left under the header, whatever height the header happens to be.
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const fit = () => {
+      const top = frame.getBoundingClientRect().top + window.scrollY;
+      frame.style.height = `${Math.max(420, window.innerHeight - top)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
+  /** Put a couple in the middle of the canvas — the tree is far wider than the screen. */
+  const centerOn = useCallback(
+    (util: ReactZoomPanPinchRef, target?: TreeLayoutDTO["couples"][number], animate = true) => {
+      const frame = frameRef.current;
+      if (!frame) return;
+      const vw = frame.clientWidth;
+      const vh = frame.clientHeight;
+      const scale = Math.min(0.9, Math.max(0.62, (vw - 120) / layout.width));
+      const fits = layout.width * scale <= vw && layout.height * scale <= vh;
+
+      const cx = target && !fits ? target.x + coupleWidth(target) / 2 : layout.width / 2;
+      const cy = target && !fits ? target.y + TREE_CARD.h / 2 : layout.height / 2;
+
+      util.setTransform(vw / 2 - cx * scale, vh / 2 - cy * scale, scale, animate ? 200 : 0);
+    },
+    [layout],
   );
 
+  const landingCouple = useMemo(
+    () =>
+      layout.couples.find((c) => c.a.id === focusId || c.b?.id === focusId) ??
+      layout.couples.find((c) => !c.a.isPlaceholder) ??
+      layout.couples[0],
+    [layout, focusId],
+  );
+
+  // The canvas positions cards with plain left/top, so it has to be laid out LTR;
+  // the cards themselves put their text back to RTL.
   return (
-    <div className="relative h-[calc(100dvh-3.6rem)] overflow-hidden bg-paper-deep">
+    <div ref={frameRef} dir="ltr" className="relative h-[70vh] overflow-hidden bg-paper-deep">
       <TransformWrapper
         minScale={0.35}
         maxScale={2.2}
         initialScale={0.85}
-        centerOnInit
         wheel={{ step: 0.12 }}
+        onInit={(util) => centerOn(util, landingCouple, false)}
       >
-        {({ zoomIn, zoomOut, centerView, setTransform }) => (
+        {(util) => (
           <>
-            <div className="absolute top-4 left-4 z-10 flex flex-wrap items-center gap-2">
-              <IconBtn onClick={() => zoomIn()}>+</IconBtn>
-              <IconBtn onClick={() => zoomOut()}>−</IconBtn>
+            <div dir="rtl" className="absolute top-4 right-4 z-10 flex flex-wrap items-center gap-2">
+              <IconBtn onClick={() => util.zoomIn()}>+</IconBtn>
+              <IconBtn onClick={() => util.zoomOut()}>−</IconBtn>
               <IconBtn
                 onClick={() => {
-                  centerView(0.85);
                   if (jump) {
-                    setTransform(
-                      -jump.x * 0.85 + 400,
-                      -jump.y * 0.85 + 200,
-                      0.85,
-                    );
+                    centerOn(util, jump);
                     setSelected(jump.a.id);
+                  } else {
+                    centerOn(util, landingCouple);
                   }
                 }}
               >
-                מרכוז
+                {jump ? `לקפוץ אל ${jump.a.firstName}` : "מרכוז"}
               </IconBtn>
               <input
                 value={q}
@@ -183,6 +230,7 @@ export function FamilyTree({
                         setSelected(c.a.id);
                       }}
                       onOpen={() => !c.a.isPlaceholder && router.push(`/people/${c.a.slug}`)}
+                      onAddParents={() => router.push(`/people/${c.a.slug}#parents`)}
                     />
                     {c.b ? (
                       <PersonCard
@@ -199,6 +247,7 @@ export function FamilyTree({
                           setSelected(c.b!.id);
                         }}
                         onOpen={() => c.b && !c.b.isPlaceholder && router.push(`/people/${c.b.slug}`)}
+                        onAddParents={() => c.b && router.push(`/people/${c.b.slug}#parents`)}
                       />
                     ) : null}
                   </div>
@@ -210,7 +259,7 @@ export function FamilyTree({
       </TransformWrapper>
 
       {selectedPerson && !selectedPerson.isPlaceholder ? (
-        <aside className="absolute bottom-0 left-0 top-0 z-20 w-full max-w-md overflow-y-auto border-r border-[var(--line)] bg-paper p-6 md:w-[380px]">
+        <aside dir="rtl" className="absolute bottom-0 right-0 top-0 z-20 w-full max-w-md overflow-y-auto border-l border-[var(--line)] bg-paper p-6 md:w-[380px]">
           <button className="mb-6 cursor-pointer text-sm text-muted" onClick={() => setSelected(null)}>
             סגירה
           </button>
@@ -239,6 +288,7 @@ function PersonCard({
   onToggle,
   onSelect,
   onOpen,
+  onAddParents,
 }: {
   person: TreePersonDTO;
   selected: boolean;
@@ -247,9 +297,19 @@ function PersonCard({
   onToggle: () => void;
   onSelect: () => void;
   onOpen: () => void;
+  onAddParents: () => void;
 }) {
   return (
-    <div className={`w-[168px] text-right ${person.isPlaceholder ? "opacity-55" : ""}`}>
+    <div dir="rtl" className={`w-[168px] text-right ${person.isPlaceholder ? "opacity-55" : ""}`}>
+      {!person.hasParents && !person.isPlaceholder ? (
+        <button
+          type="button"
+          onClick={onAddParents}
+          className="mb-2 w-full cursor-pointer border border-dashed border-[var(--line-strong)] py-1 text-[11px] text-bronze transition-colors hover:border-bronze hover:text-ink"
+        >
+          ＋ ההורים של {person.firstName}
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onSelect}

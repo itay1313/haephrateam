@@ -17,6 +17,7 @@ function toDTO(
     placeholderKind: string | null;
   },
   portraits: Map<string, string | null>,
+  withParents: Set<string>,
 ): TreePersonDTO {
   return {
     id: person.id,
@@ -28,6 +29,7 @@ function toDTO(
     isPlaceholder: person.isPlaceholder,
     placeholderKind: person.placeholderKind,
     portraitUrl: portraits.get(person.id) ?? null,
+    hasParents: withParents.has(person.id),
   };
 }
 
@@ -39,6 +41,11 @@ export default async function TreePage({
   const { person: slug } = await searchParams;
   const { people, graph } = await loadGraph();
   const portraits = new Map(people.map((p) => [p.id, p.portrait?.storageKey ?? null]));
+  // Who already has at least one parent in the archive — the rest get an
+  // "add parents" prompt on their card.
+  const withParents = new Set(
+    people.filter((p) => parents(graph, p.id).length > 0).map((p) => p.id),
+  );
   const layout = layoutTree(graph);
   const dto: TreeLayoutDTO = {
     width: layout.width,
@@ -46,8 +53,8 @@ export default async function TreePage({
     parentEdges: layout.parentEdges,
     couples: layout.couples.map((c) => ({
       key: c.key,
-      a: toDTO(c.a, portraits),
-      b: c.b ? toDTO(c.b, portraits) : null,
+      a: toDTO(c.a, portraits, withParents),
+      b: c.b ? toDTO(c.b, portraits, withParents) : null,
       x: c.x,
       y: c.y,
       gen: c.gen,
@@ -56,7 +63,7 @@ export default async function TreePage({
   };
 
   const compass: CompassPerson[] = graph.people.map((p) => ({
-    ...toDTO(p, portraits),
+    ...toDTO(p, portraits, withParents),
     parentIds: parents(graph, p.id).map((x) => x.id),
     childIds: children(graph, p.id).map((x) => x.id),
     partnerIds: partners(graph, p.id).map((x) => x.id),

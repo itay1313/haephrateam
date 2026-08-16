@@ -115,7 +115,9 @@ export default async function PersonPage({
               </div>
             ) : null}
           </dl>
-          <AddParentButtons personId={person.id} missing={parentList.length < 2} />
+          <div id="parents" className="scroll-mt-28">
+            <AddParentButtons personId={person.id} missing={parentList.length < 2} />
+          </div>
         </div>
       </header>
 
