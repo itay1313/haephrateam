@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createSession } from "@/lib/auth";
 
-const FAMILY_PASSWORD = (process.env.FAMILY_PASSWORD ?? "13").trim();
+/** Tolerates a value written as 13, "13" or ' 13 ' in .env. */
+function familyPassword() {
+  return (process.env.FAMILY_PASSWORD ?? "13").trim().replace(/^["']|["']$/g, "");
+}
 
-// A family-sized brake on password guessing: 10 tries per address per 10 minutes.
+// A family-sized brake on password guessing: 20 tries per address per 10 minutes.
 const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 20;
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 function tooManyAttempts(ip: string) {
@@ -18,20 +21,6 @@ function tooManyAttempts(ip: string) {
   }
   entry.count += 1;
   return entry.count > MAX_ATTEMPTS;
-}
-
-async function matchPersonByName(name: string) {
-  const wanted = name.replace(/\s+/g, " ").trim().toLowerCase();
-  if (!wanted) return null;
-  const people = await prisma.person.findMany({
-    where: { isPlaceholder: false },
-    select: { id: true, firstName: true, lastName: true },
-  });
-  return (
-    people.find(
-      (p) => [p.firstName, p.lastName].filter(Boolean).join(" ").toLowerCase() === wanted,
-    ) ?? null
-  );
 }
 
 export async function POST(request: NextRequest) {
@@ -49,13 +38,9 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const password = String(body?.password ?? "").trim();
   const name = String(body?.name ?? "").trim().slice(0, 60);
-  const personId = String(body?.personId ?? "").trim() || null;
 
-  if (password !== FAMILY_PASSWORD) {
+  if (password !== familyPassword()) {
     return NextResponse.json({ error: "הסיסמה אינה נכונה" }, { status: 401 });
-  }
-  if (name.length < 2) {
-    return NextResponse.json({ error: "כתבו את השם שלכם" }, { status: 400 });
   }
 
   const user =
@@ -68,13 +53,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Link the visitor to their person in the tree when the name matches one.
-  // Matching happens here so the family list never leaves the server before login.
-  const person = personId
-    ? await prisma.person.findUnique({ where: { id: personId }, select: { id: true } })
-    : await matchPersonByName(name);
-
   attempts.delete(ip);
-  await createSession(user.id, { name, personId: person?.id ?? null });
+  await createSession(user.id, name ? { name } : undefined);
   return NextResponse.json({ ok: true });
 }

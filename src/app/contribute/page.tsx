@@ -19,12 +19,6 @@ export default async function ContributePage() {
         כל אחד במשפחה יכול להעלות תמונות מהמכשיר, לבחור תמונות מגוגל תמונות, או לכתוב כמה מילים.
         מה שנשמר כאן נראה לכולם, אחרי כניסה עם הסיסמה.
       </p>
-      {session?.visitorName ? (
-        <p className="mt-6 border-r-2 border-bronze pr-4 text-sm text-ink-soft">
-          מה שתוסיפו ירשם על שם <strong className="font-medium">{session.visitorName}</strong>.
-          כדי לשנות, צאו וכנסו מחדש.
-        </p>
-      ) : null}
       <Suspense>
         <ContributeForm
           people={people}
