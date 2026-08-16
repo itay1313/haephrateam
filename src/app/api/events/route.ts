@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
+import { existingPeople } from "@/lib/validate";
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
@@ -20,7 +21,9 @@ export async function POST(request: NextRequest) {
       description: body?.description || null,
     },
   });
-  const personIds: string[] = Array.isArray(body?.personIds) ? body.personIds : [];
+  const personIds = await existingPeople(
+    Array.isArray(body?.personIds) ? body.personIds.map(String) : [],
+  );
   if (personIds.length) {
     await prisma.personEvent.createMany({
       data: personIds.map((personId) => ({ eventId: event.id, personId })),

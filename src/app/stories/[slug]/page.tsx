@@ -33,6 +33,9 @@ export default async function StoryPage({ params }: { params: Promise<{ slug: st
           ))}
           {story.location ? ` · ${story.location.name}` : ""}
         </p>
+        {story.contributorName ? (
+          <p className="mt-2 text-sm text-muted">נכתב על ידי {story.contributorName}</p>
+        ) : null}
       </header>
       {story.media[0] ? (
         <div className="mx-auto mt-14 max-w-[1000px] px-5">
@@ -47,7 +50,7 @@ export default async function StoryPage({ params }: { params: Promise<{ slug: st
           comments={story.comments.map((c) => ({
             id: c.id,
             body: c.body,
-            author: c.author.displayName ?? c.author.email,
+            author: c.authorName ?? c.author.displayName ?? c.author.email,
             createdAt: c.createdAt.toISOString(),
           }))}
         />

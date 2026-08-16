@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC = ["/login", "/api/auth/login", "/family"];
+// Everything behind the family password, except the login screen itself and the
+// single image it uses as a background.
+const PUBLIC = ["/login", "/api/auth/login", "/family/hills-memory.jpg"];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   if (
     pathname.startsWith("/_next") ||

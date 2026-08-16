@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
 import { z } from "zod";
+import { slugify } from "@/lib/slug";
 
 const personSchema = z.object({
   firstName: z.string().min(1),
@@ -22,11 +23,6 @@ const personSchema = z.object({
     .optional(),
   familyIds: z.array(z.string()).optional(),
 });
-
-function slugify(first: string, last?: string | null) {
-  const base = [first, last].filter(Boolean).join("-").replace(/\s+/g, "-");
-  return `${base}-${Math.random().toString(36).slice(2, 7)}`;
-}
 
 export async function GET() {
   const user = await getSessionUser();

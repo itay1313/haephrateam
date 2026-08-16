@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Rubik } from "next/font/google";
 import "./globals.css";
-import { SiteNav } from "@/components/site/SiteNav";
+import { SiteHeader } from "@/components/site/SiteHeader";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import { AddSheet } from "@/components/forms/AddSheet";
 import { getSessionUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -38,8 +39,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-paper text-ink">
         {user ? (
           <>
-            <SiteNav />
+            <SiteHeader
+              user={{ displayName: user.displayName, role: user.role, email: user.email }}
+            />
             <main className="flex-1">{children}</main>
+            <SiteFooter />
             <AddSheet people={people} albums={albums} role={user.role} />
           </>
         ) : (

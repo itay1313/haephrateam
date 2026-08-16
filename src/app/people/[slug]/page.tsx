@@ -235,7 +235,7 @@ export default async function PersonPage({
           comments={person.comments.map((c) => ({
             id: c.id,
             body: c.body,
-            author: c.author.displayName ?? c.author.email,
+            author: c.authorName ?? c.author.displayName ?? c.author.email,
             createdAt: c.createdAt.toISOString(),
           }))}
         />

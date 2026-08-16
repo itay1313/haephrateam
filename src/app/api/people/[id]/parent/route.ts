@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
+import { slugify } from "@/lib/slug";
 
 export async function POST(
   request: NextRequest,
@@ -19,7 +20,7 @@ export async function POST(
 
   const parent = await prisma.person.create({
     data: {
-      slug: `${firstName}-${Math.random().toString(36).slice(2, 7)}`,
+      slug: slugify(firstName, body?.lastName),
       firstName,
       lastName: body?.lastName || null,
       maidenName: body?.maidenName || null,

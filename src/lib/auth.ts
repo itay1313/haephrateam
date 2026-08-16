@@ -7,6 +7,7 @@ export type Role = "OWNER" | "ADMIN" | "FAMILY" | "VIEWER";
 export type SessionUser = {
   id: string;
   email: string;
+  /** The name this visitor gave when signing in, falling back to the account name. */
   displayName: string | null;
   role: Role;
   personId: string | null;
@@ -34,11 +35,20 @@ function sha(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export async function createSession(userId: string) {
+export async function createSession(
+  userId: string,
+  visitor?: { name?: string | null; personId?: string | null },
+) {
   const raw = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await prisma.session.create({
-    data: { userId, token: sha(raw), expiresAt },
+    data: {
+      userId,
+      token: sha(raw),
+      expiresAt,
+      visitorName: visitor?.name?.trim() || null,
+      visitorPersonId: visitor?.personId || null,
+    },
   });
   const jar = await cookies();
   jar.set(COOKIE, raw, {
@@ -80,9 +90,9 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return {
     id: session.user.id,
     email: session.user.email,
-    displayName: session.user.displayName,
+    displayName: session.visitorName ?? session.user.displayName,
     role: session.user.role as Role,
-    personId: session.user.personId,
+    personId: session.visitorPersonId ?? session.user.personId,
   };
 }
 

@@ -29,6 +29,8 @@
   --font-sans: var(--font-rubik);
 }
 
+@layer base {
+
 * {
   box-sizing: border-box;
 }
@@ -60,6 +62,32 @@ textarea,
 select {
   font-family: inherit;
 }
+
+input,
+textarea,
+select {
+  font-size: 1rem;
+  background: var(--cream);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  padding: 0.7rem 0.9rem;
+  width: 100%;
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--bronze);
+}
+
+::placeholder {
+  color: var(--muted);
+}
+
+}
+
+@layer components {
 
 .font-display {
   font-family: var(--font-rubik), "Rubik", sans-serif;
@@ -103,26 +131,6 @@ select {
   cursor: grabbing;
 }
 
-input,
-textarea,
-select {
-  font-size: 1rem;
-  background: var(--cream);
-  border: 1px solid var(--line-strong);
-  color: var(--ink);
-  padding: 0.7rem 0.9rem;
-  width: 100%;
-  outline: none;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  border-color: var(--bronze);
-}
-
-::placeholder {
-  color: var(--muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

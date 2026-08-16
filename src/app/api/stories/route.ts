@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
+import { slugify } from "@/lib/slug";
+import { existingPeople } from "@/lib/validate";
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
@@ -14,7 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "חסרים כותרת או תוכן" }, { status: 400 });
   }
   const year = body?.year ? Number(body.year) : null;
-  const slug = `${title.slice(0, 24)}-${Math.random().toString(36).slice(2, 6)}`.replace(/\s+/g, "-");
+  const slug = slugify(title);
   const story = await prisma.story.create({
     data: {
       slug,
@@ -24,10 +26,13 @@ export async function POST(request: NextRequest) {
       year: Number.isFinite(year) ? year : null,
       decade: Number.isFinite(year) ? Math.floor(year! / 10) * 10 : null,
       authorId: user.id,
+      contributorName: user.displayName,
       featured: Boolean(body?.featured),
     },
   });
-  const personIds: string[] = Array.isArray(body?.personIds) ? body.personIds : [];
+  const personIds = await existingPeople(
+    Array.isArray(body?.personIds) ? body.personIds.map(String) : [],
+  );
   if (personIds.length) {
     await prisma.personStory.createMany({
       data: personIds.map((personId) => ({ storyId: story.id, personId })),

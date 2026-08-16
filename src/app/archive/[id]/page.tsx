@@ -61,11 +61,10 @@ export default async function ArchiveItemPage({
               </dd>
             </div>
           ) : null}
-          {item.uploadedBy ? (
+          {item.contributorName ? (
+            <Row label="הוסיף/ה לארכיון" value={item.contributorName} />
+          ) : item.uploadedBy ? (
             <Row label="הועלה על ידי" value={item.uploadedBy.displayName ?? item.uploadedBy.email} />
-          ) : null}
-          {item.providedBy ? (
-            <Row label="המידע סופק על ידי" value={item.providedBy.displayName ?? item.providedBy.email} />
           ) : null}
           {item.album ? (
             <div>
@@ -83,7 +82,7 @@ export default async function ArchiveItemPage({
             comments={item.comments.map((c) => ({
               id: c.id,
               body: c.body,
-              author: c.author.displayName ?? c.author.email,
+              author: c.authorName ?? c.author.displayName ?? c.author.email,
               createdAt: c.createdAt.toISOString(),
             }))}
           />

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
+import { slugify } from "@/lib/slug";
 
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
   if (!title) return NextResponse.json({ error: "חסרה כותרת" }, { status: 400 });
   const album = await prisma.album.create({
     data: {
-      slug: `${title}-${Math.random().toString(36).slice(2, 6)}`.replace(/\s+/g, "-"),
+      slug: slugify(title),
       title,
       description: body?.description || null,
       category: body?.category || null,

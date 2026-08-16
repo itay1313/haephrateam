@@ -16,18 +16,25 @@ export function CommentThread({
 }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function send() {
     if (!body.trim()) return;
     setBusy(true);
-    await fetch("/api/comments", {
+    setError(null);
+    const res = await fetch("/api/comments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ body, mediaId, storyId, personId }),
-    });
-    setBody("");
+    }).catch(() => null);
     setBusy(false);
+    if (!res || !res.ok) {
+      const json = res ? await res.json().catch(() => null) : null;
+      setError(json?.error ?? "לא הצלחנו לשמור. נסו שוב.");
+      return;
+    }
+    setBody("");
     router.refresh();
   }
 
@@ -57,6 +64,7 @@ export function CommentThread({
         >
           הוספת זיכרון
         </button>
+        {error ? <p className="mt-3 text-sm text-wine">{error}</p> : null}
       </div>
     </div>
   );

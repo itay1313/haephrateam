@@ -42,6 +42,8 @@ model Session {
   googleTokenExpiry  DateTime?
   googlePickerId     String?
   googlePickerUri    String?
+  visitorName        String?
+  visitorPersonId    String?
   createdAt          DateTime  @default(now())
 }
 
@@ -197,6 +199,7 @@ model Media {
   eventId      String?
   event        Event?    @relation(fields: [eventId], references: [id])
   isHistorical Boolean   @default(false)
+  contributorName String?
   createdAt    DateTime  @default(now())
 
   people     PersonMedia[]
@@ -253,6 +256,7 @@ model Story {
   location   Location? @relation(fields: [locationId], references: [id])
   authorId   String?
   author     User?     @relation(fields: [authorId], references: [id])
+  contributorName String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -356,5 +360,6 @@ model Comment {
   media     Media?   @relation(fields: [mediaId], references: [id])
   storyId   String?
   story     Story?   @relation(fields: [storyId], references: [id])
+  authorName String?
   createdAt DateTime @default(now())
 }

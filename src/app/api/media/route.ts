@@ -4,9 +4,29 @@ import { getSessionUser, canEdit } from "@/lib/auth";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
+import { existingAlbum, existingPeople } from "@/lib/validate";
+
+const MAX_BYTES = 40 * 1024 * 1024;
+const ALLOWED = ["image/", "video/", "audio/", "application/pdf"];
+
+function rejectReason(file: File) {
+  if (file.size > MAX_BYTES) return `${file.name}: הקובץ גדול מ־40MB`;
+  const type = file.type || "";
+  if (!ALLOWED.some((prefix) => type.startsWith(prefix))) {
+    return `${file.name}: אפשר להעלות תמונות, סרטונים, הקלטות או PDF`;
+  }
+  return null;
+}
+
+function mediaType(mime: string) {
+  if (mime.startsWith("video/")) return "VIDEO";
+  if (mime.startsWith("audio/")) return "AUDIO";
+  if (mime === "application/pdf") return "DOCUMENT";
+  return "PHOTO";
+}
 
 async function saveFile(file: File) {
-  const ext = path.extname(file.name) || ".bin";
+  const ext = path.extname(file.name).slice(0, 10).replace(/[^a-zA-Z0-9.]/g, "") || ".bin";
   const key = `${randomBytes(12).toString("hex")}${ext}`;
   const dir = path.join(process.cwd(), "uploads");
   await mkdir(dir, { recursive: true });
@@ -28,24 +48,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "חסר קובץ" }, { status: 400 });
   }
 
-  const personIds = [
+  const rejected = files.map(rejectReason).find(Boolean);
+  if (rejected) {
+    return NextResponse.json({ error: rejected }, { status: 400 });
+  }
+
+  const requestedPeople = [
     ...form.getAll("personIds").map((v) => String(v)),
     ...String(form.get("personIds") ?? "").split(","),
   ]
     .map((s) => s.trim())
     .filter(Boolean);
+  const personIds = await existingPeople(requestedPeople);
   const yearRaw = form.get("year");
   const year = yearRaw ? Number(yearRaw) : null;
   const title = String(form.get("title") || "") || null;
   const narrative = String(form.get("narrative") || "") || null;
   const caption = String(form.get("caption") || "") || null;
 
+  const albumId = await existingAlbum(String(form.get("albumId") || "") || null);
+
   const created = [];
   for (const file of files) {
     const saved = await saveFile(file);
     const media = await prisma.media.create({
       data: {
-        type: file.type.startsWith("video") ? "VIDEO" : "PHOTO",
+        type: mediaType(file.type),
         title: title || file.name,
         filename: saved.filename,
         mimeType: saved.mimeType,
@@ -54,9 +82,10 @@ export async function POST(request: NextRequest) {
         caption,
         narrative,
         isHistorical: form.get("isHistorical") === "true",
-        albumId: String(form.get("albumId") || "") || null,
+        albumId,
         uploadedById: user.id,
         providedById: user.id,
+        contributorName: user.displayName,
       },
     });
     if (personIds.length) {

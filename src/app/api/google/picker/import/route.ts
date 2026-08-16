@@ -61,6 +61,7 @@ export async function POST() {
         storageKey: key,
         uploadedById: session.userId,
         providedById: session.userId,
+        contributorName: session.visitorName,
       },
     });
     count += 1;
