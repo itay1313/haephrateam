@@ -2,9 +2,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Neon Postgres, provisioned through the Vercel marketplace. The pooled URL
+// serves requests; migrations need the direct one.
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("NEON_POSTGRES_PRISMA_URL")
+  directUrl = env("NEON_POSTGRES_URL_NON_POOLING")
 }
 
 // ─── Access ───────────────────────────────────────────────────────────────────

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, canEdit } from "@/lib/auth";
-import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
 import { existingAlbum, existingPeople } from "@/lib/validate";
+import { saveUpload } from "@/lib/storage";
 
 const MAX_BYTES = 40 * 1024 * 1024;
 const ALLOWED = ["image/", "video/", "audio/", "application/pdf"];
@@ -28,10 +28,9 @@ function mediaType(mime: string) {
 async function saveFile(file: File) {
   const ext = path.extname(file.name).slice(0, 10).replace(/[^a-zA-Z0-9.]/g, "") || ".bin";
   const key = `${randomBytes(12).toString("hex")}${ext}`;
-  const dir = path.join(process.cwd(), "uploads");
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, key), Buffer.from(await file.arrayBuffer()));
-  return { key, filename: file.name, mimeType: file.type || "application/octet-stream" };
+  const mimeType = file.type || "application/octet-stream";
+  await saveUpload(key, Buffer.from(await file.arrayBuffer()), mimeType);
+  return { key, filename: file.name, mimeType };
 }
 
 export async function POST(request: NextRequest) {

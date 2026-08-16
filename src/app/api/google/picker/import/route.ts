@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { getSessionRecord, canEdit } from "@/lib/auth";
 import { ensureGoogleAccess, googleFetch } from "@/lib/google";
+import { saveUpload } from "@/lib/storage";
 
 export async function POST() {
   const session = await getSessionRecord();
@@ -39,8 +39,6 @@ export async function POST() {
     pageToken = payload.nextPageToken;
   } while (pageToken);
 
-  const dir = path.join(process.cwd(), "uploads");
-  await mkdir(dir, { recursive: true });
   let count = 0;
 
   for (const item of items) {
@@ -51,7 +49,7 @@ export async function POST() {
     const buf = Buffer.from(await bytes.arrayBuffer());
     const ext = path.extname(file.filename || "") || ".jpg";
     const key = `${randomBytes(12).toString("hex")}${ext}`;
-    await writeFile(path.join(dir, key), buf);
+    await saveUpload(key, buf, file.mimeType || "image/jpeg");
     await prisma.media.create({
       data: {
         type: (file.mimeType || "").startsWith("video") ? "VIDEO" : "PHOTO",

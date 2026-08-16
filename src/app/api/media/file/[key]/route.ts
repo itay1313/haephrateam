@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser } from "@/lib/auth";
-import { createReadStream } from "fs";
-import { stat } from "fs/promises";
+import { readUpload } from "@/lib/storage";
 import path from "path";
-import { Readable } from "stream";
 
 const EXT_MIME: Record<string, string> = {
   ".png": "image/png",
@@ -35,12 +33,8 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const filePath = path.join(process.cwd(), "uploads", key);
-  try {
-    await stat(filePath);
-  } catch {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  const file = await readUpload(key);
+  if (!file) return new NextResponse("Not found", { status: 404 });
 
   // Prefer the type recorded at upload time; fall back to the extension.
   const record = await prisma.media.findFirst({
@@ -48,15 +42,14 @@ export async function GET(
     select: { mimeType: true },
   });
   const ext = path.extname(key).toLowerCase();
-  const mime = record?.mimeType || EXT_MIME[ext] || "application/octet-stream";
-  const safeMime = /^(image|video|audio)\//.test(mime) || mime === "application/pdf"
-    ? mime
-    : "application/octet-stream";
+  const mime =
+    record?.mimeType || file.contentType || EXT_MIME[ext] || "application/octet-stream";
+  const safeMime =
+    /^(image|video|audio)\//.test(mime) || mime === "application/pdf"
+      ? mime
+      : "application/octet-stream";
 
-  const stream = createReadStream(filePath);
-  const web = Readable.toWeb(stream) as ReadableStream;
-
-  return new NextResponse(web, {
+  return new NextResponse(file.stream, {
     headers: {
       "Content-Type": safeMime,
       "Content-Disposition": "inline",
